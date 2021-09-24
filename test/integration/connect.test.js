@@ -33,8 +33,9 @@ test.before(async t => {
   const container = await docker.createContainer({
     Image: 'dogecoind',
     name: 'dogecoind_regtest',
-    PortBindings: {['18444/tcp']: [{ HostIp: '0.0.0.0', HostPort: '18444' }]},
-    NetworkMode: 'host'
+    PortBindings: {['18444/tcp']: [{ HostIp: '127.0.0.1', HostPort: '18444' }]},
+    NetworkMode: 'host',
+    AutoRemove: true
   })
 
   t.log('container created')
@@ -42,36 +43,37 @@ test.before(async t => {
   await container.start({})
 
   t.log('container started')
+  
+  t.context.spvnode = spvnode
+  t.context.settings = settings
+  t.context.container = container
 
   // Wait 5 seconds
   // Needed otherwise we try to connect when node is not ready
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  t.context = { spvnode, settings, container }
+  await new Promise(resolve => {
+    setTimeout(() => {
+      resolve('resolved')
+    }, 5000)
+  });
 })
 
-test.after.always(async t => {
-  t.log('Tests done')
-  // Clean after
-  fs.rmSync(path.join(__dirname, 'data'), {recursive: true})
-  
-  const container = t.context.container
-
-  await container.stop()
-  await container.remove()
-})
-
-test.serial('should connect to regtest node', async t => {
+test('should connect to regtest node', async t => {
   let spvnode = t.context.spvnode
   let settings =  t.context.settings
 
   t.log(`Connecting peer to ${settings.NODE_IP}:${settings.DEFAULT_PORT}`)
 
-  await spvnode.addPeer(settings.NODE_IP, settings.DEFAULT_PORT)
+  spvnode.addPeer(settings.NODE_IP, settings.DEFAULT_PORT)
 
   t.log('Peer connected')
 
   t.pass()
+})
+
+test.after.always('cleanup', async t => {
+  t.log('Tests done')
+  // Clean after
+  fs.rmSync(path.join(__dirname, 'data'), {recursive: true})
 })
 
 test.todo('should send version message to regtest node')
